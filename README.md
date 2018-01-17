@@ -47,3 +47,21 @@ Then, check your installation
 ```bash
 gpio -v
 ```
+
+**Building the source**
+
+Clone this repository, and build it by simply running:
+
+```bash
+git clone https://github.com/mania25/LoDrone-Server
+cd LoDrone-Server
+make
+```
+
+If everything works fine, an executable namely `rf95_server` will be created.
+
+### Running the gateway
+
+```bash
+sudo ./rf95_server
+```
