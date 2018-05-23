@@ -47,7 +47,6 @@
 
 // DycodeX LoRa Raspberry PI hat V2
 // =========================================
-// see https://github.com/dycodex/LoRa-Raspberry-Pi-Hat
 #define BOARD_DYCODEX_V2
 
 // Now we include RasPi_Boards.h so this will expose defined
