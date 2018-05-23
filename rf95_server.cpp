@@ -43,7 +43,7 @@
 // DycodeX LoRa Raspberry PI hat
 // =========================================
 // see https://github.com/dycodex/LoRa-Raspberry-Pi-Hat
-#define BOARD_DYCODEX
+#define BOARD_DYCODEX_V2
 
 // Now we include RasPi_Boards.h so this will expose defined
 // constants with CS/IRQ/RESET/on board LED pins definition
