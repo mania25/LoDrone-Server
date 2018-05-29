@@ -73,7 +73,7 @@ const std::string user =
 const std::string password =
     "50acea3098359517297e08040dc6bfc371d044190be6527c1ac29e078cbe8313";
 
-const int QOS = 1;
+const int QOS = 0;
 
 /////////////////////////////////////////////////////////////////////////////
 // Class to receive callbacks
@@ -139,6 +139,7 @@ int main(int argc, const char *argv[]) {
   if (!rf95.init()) {
     fprintf(stderr, "\nRF95 module init failed, Please verify wiring/module\n");
   } else {
+    printf("\nRF95 module seen OK!\r\n");
     // Defaults after init are 434.0MHz, 13dBm, Bw = 125 kHz, Cr = 4/5, Sf =
     // 128chips/symbol, CRC on
 
@@ -175,7 +176,7 @@ int main(int argc, const char *argv[]) {
     // We're ready to listen for incoming message
     rf95.setModeRx();
 
-    std::cout << "Initialzing..." << std::endl;
+    std::cout << "\nInitialzing..." << std::flush;
     mqtt::client client(SERVER_ADDRESS, CLIENT_ID);
 
     user_callback cb;
@@ -185,15 +186,28 @@ int main(int argc, const char *argv[]) {
     connOpts.set_keep_alive_interval(20);
     connOpts.set_clean_session(true);
 
+    connOpts.set_connection_timeout(60);
+    connOpts.set_connect_timeout(60);
+    
+    connOpts.set_automatic_reconnect(true);
+    connOpts.set_automatic_reconnect(1, 10);
+
     connOpts.set_user_name(user.c_str());
     connOpts.set_password(password.c_str());
 
-    std::cout << "...OK" << std::endl;
+    std::cout << "OK" << std::endl;
 
-    printf(" OK NodeID=%d @ %3.2fMHz\n", RF_NODE_ID, RF_FREQUENCY);
-    printf("Listening packet...\n");
+    printf("RF95 node #%d init OK @ %3.2fMHz\n", RF_NODE_ID, RF_FREQUENCY);
+    
+    bcm2835_delay(10000);
 
     // Begin the main body of code
+    std::cout << "Connecting to the MQTT server..." << std::flush;
+    client.connect(connOpts);
+    std::cout << "OK\n" << std::endl;
+
+    std::cout << "Listening packet...\n" << std::endl;
+
     while (!force_exit) {
 
 #ifdef RF_IRQ_PIN
@@ -228,21 +242,11 @@ int main(int argc, const char *argv[]) {
             std::string message(buf, buf + len);
             std::cout << "\nGot Message: " << message << '\n';
             try {
-              std::cout << "\nConnecting..." << std::endl;
-              client.connect(connOpts);
-              std::cout << "...OK" << std::endl;
-
               // First use a message pointer.
-
               std::cout << "\nSending message..." << std::endl;
               auto pubmsg = mqtt::make_message(TOPIC, message);
               pubmsg->set_qos(QOS);
               client.publish(pubmsg);
-              std::cout << "...OK" << std::endl;
-
-              // Disconnect
-              std::cout << "\nDisconnecting..." << std::endl;
-              client.disconnect();
               std::cout << "...OK" << std::endl;
             } catch (const mqtt::exception &exc) {
               std::cerr << exc.what() << std::endl;
@@ -272,6 +276,11 @@ int main(int argc, const char *argv[]) {
       // this delay, but this will charge CPU usage, take care and monitor
       bcm2835_delay(5);
     }
+
+    // Disconnect
+    std::cout << "\nDisconnecting from the MQTT server..." << std::flush;
+    client.disconnect();
+    std::cout << "OK" << std::endl;
   }
 
 #ifdef RF_LED_PIN
