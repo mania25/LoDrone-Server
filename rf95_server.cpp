@@ -114,7 +114,7 @@ std::string getEnvVar( std::string const &key )
 void logger( const std::string &text )
 {
     std::ofstream log_file(
-        "log_flight.log", std::ios_base::out | std::ios_base::app );
+        "/home/pi/Documents/TA/LoraDroneControl/log_flight.log", std::ios_base::out | std::ios_base::app );
     log_file << text << std::endl;
     log_file.close();
 }
