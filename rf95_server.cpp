@@ -80,7 +80,7 @@ const int QOS = 0;
 
 class user_callback : public virtual mqtt::callback {
   void connection_lost(const std::string &cause) override {
-    std::cout << "\nConnection lost" << std::endl;
+    std::cout << "\n[rf95_server][main][warning] Connection lost" << std::endl;
     if (!cause.empty())
       std::cout << "\tcause: " << cause << std::endl;
   }
@@ -88,20 +88,49 @@ class user_callback : public virtual mqtt::callback {
 public:
 };
 
+/*
+std::string split implementation by using delimeter as a character.
+*/
+std::vector<std::string> split(std::string strToSplit, char delimeter)
+{
+  std::stringstream ss(strToSplit);
+  std::string item;
+	std::vector<std::string> splittedStrings;
+  while (std::getline(ss, item, delimeter)) {
+		splittedStrings.push_back(item);
+  }
+  return splittedStrings;
+}
+
+std::string getEnvVar( std::string const & key ) const
+{
+    char * val = getenv( key.c_str() );
+    return val == NULL ? std::string("") : std::string(val);
+}
+
+void logger( const std::string &text )
+{
+    std::ofstream log_file(
+        "log_flight.log", std::ios_base::out | std::ios_base::app );
+    log_file << text << std::end;
+    log_file.close();
+}
+
 void sig_handler(int sig) {
-  printf("\n%s Break received, exiting!\n", __BASEFILE__);
+  printf("\n[rf95_server][main][info] %s Break received, exiting!\n", __BASEFILE__);
   force_exit = true;
 }
 
 // Main Function
 int main(int argc, const char *argv[]) {
   unsigned long led_blink = 0;
+  const string deviceID = getEnvVar("device_id");
 
   signal(SIGINT, sig_handler);
   printf("%s\n", __BASEFILE__);
 
   if (!bcm2835_init()) {
-    fprintf(stderr, "%s bcm2835_init() Failed\n\n", __BASEFILE__);
+    fprintf(stderr, "[rf95_server][main][error] %s bcm2835_init() Failed\n\n", __BASEFILE__);
     return 1;
   }
 
@@ -137,9 +166,9 @@ int main(int argc, const char *argv[]) {
 #endif
 
   if (!rf95.init()) {
-    fprintf(stderr, "\nRF95 module init failed, Please verify wiring/module\n");
+    fprintf(stderr, "\n[rf95_server][main][error] RF95 module init failed, Please verify wiring/module\n");
   } else {
-    printf("\nRF95 module seen OK!\r\n");
+    printf("\n[rf95_server][main][info] RF95 module seen OK!\r\n");
     // Defaults after init are 434.0MHz, 13dBm, Bw = 125 kHz, Cr = 4/5, Sf =
     // 128chips/symbol, CRC on
 
@@ -176,7 +205,7 @@ int main(int argc, const char *argv[]) {
     // We're ready to listen for incoming message
     rf95.setModeRx();
 
-    std::cout << "\nInitialzing..." << std::flush;
+    std::cout << "\n[rf95_server][main][info] Initialzing..." << std::flush;
     mqtt::client client(SERVER_ADDRESS, CLIENT_ID);
 
     user_callback cb;
@@ -197,16 +226,16 @@ int main(int argc, const char *argv[]) {
 
     std::cout << "OK" << std::endl;
 
-    printf("RF95 node #%d init OK @ %3.2fMHz\n", RF_NODE_ID, RF_FREQUENCY);
+    printf("[rf95_server][main][info] RF95 node #%d init OK @ %3.2fMHz\n", RF_NODE_ID, RF_FREQUENCY);
     
     bcm2835_delay(10000);
 
     // Begin the main body of code
-    std::cout << "Connecting to the MQTT server..." << std::flush;
+    std::cout << "[rf95_server][main][info] Connecting to the MQTT server..." << std::flush;
     client.connect(connOpts);
-    std::cout << "OK\n" << std::endl;
+    std::cout << "[rf95_server][main][info] OK\n" << std::endl;
 
-    std::cout << "Listening packet...\n" << std::endl;
+    std::cout << "[rf95_server][main][info] Listening packet...\n" << std::endl;
 
     while (!force_exit) {
 
@@ -237,27 +266,40 @@ int main(int argc, const char *argv[]) {
           int8_t rssi = rf95.lastRssi();
 
           if (rf95.recv(buf, &len)) {
-            printf("Packet[%02d] #%d => #%d %ddB: ", len, from, to, rssi);
+            int64_t receivedMessageTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+            
+            printf("[rf95_server][main][info] Packet[%02d] #%d => #%d %ddB: ", len, from, to, rssi);
             printbuffer(buf, len);
             std::string message(buf, buf + len);
-            std::cout << "\nGot Message: " << message << '\n';
+            std::cout << "\n[rf95_server][main][info] Got Message: " << message << '\n';
             try {
-              // First use a message pointer.
-              std::cout << "\nSending message..." << std::endl;
-              auto pubmsg = mqtt::make_message(TOPIC, message);
-              pubmsg->set_qos(QOS);
-              client.publish(pubmsg);
-              std::cout << "...OK" << std::endl;
+              std::vector<std::string> extractReceivedData = split(message, '|');
+
+              if (extractReceivedData.size() > 1) {
+                int64_t sendingTimeFromGS = strtoll(extractReceivedData[2]);
+                int64_t receiveTimeDelayInMillis = receivedMessageTime - sendingTimeFromGS;
+                
+                logger("Message " + extractReceivedData[1] + " received in " + to_string(receiveTimeDelayInMillis) + " ms");
+
+                if (extractReceivedData[0] == deviceID) {
+                  // First use a message pointer.
+                  std::cout << "\n[rf95_server][main][info] Sending message..." << std::endl;
+                  auto pubmsg = mqtt::make_message(TOPIC, extractReceivedData[1]);
+                  pubmsg->set_qos(QOS);
+                  client.publish(pubmsg);
+                  std::cout << "...OK" << std::endl;
+                }
+              }
             } catch (const mqtt::exception &exc) {
               std::cerr << exc.what() << std::endl;
               return 1;
             }
           } else {
-            Serial.print("receive failed");
+            Serial.print("[rf95_server][main][warning] receive failed");
           }
           printf("\n");
         } else {
-          Serial.println("Not Receiving Any Command. . .");
+          Serial.println("[rf95_server][main][info] Not Receiving Any Command. . .");
         }
 
 #ifdef RF_IRQ_PIN
@@ -278,7 +320,7 @@ int main(int argc, const char *argv[]) {
     }
 
     // Disconnect
-    std::cout << "\nDisconnecting from the MQTT server..." << std::flush;
+    std::cout << "\n[rf95_server][main][info] Disconnecting from the MQTT server..." << std::flush;
     client.disconnect();
     std::cout << "OK" << std::endl;
   }
