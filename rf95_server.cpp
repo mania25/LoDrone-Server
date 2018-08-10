@@ -292,7 +292,7 @@ int main(int argc, const char *argv[]) {
                 int64_t sendingTimeFromGS = strtoll(extractReceivedData[2].c_str(), NULL, 10);
                 int64_t receiveTimeDelayInMillis = receivedMessageTime - sendingTimeFromGS;
                 
-                logger("Received at: " + std::string(receivedMessageTime) + ", Message: " + extractReceivedData[1] + ", Time Delay: " + std::to_string(receiveTimeDelayInMillis) + "ms, RSSI: " + std::to_string(rssi) + " dB");
+                logger("Received at: " + std::to_string(receivedMessageTime) + ", Message: " + extractReceivedData[1] + ", Time Delay: " + std::to_string(receiveTimeDelayInMillis) + "ms, RSSI: " + std::to_string(rssi) + " dB");
 
                 if (extractReceivedData[0] == deviceID) {
                   // First use a message pointer.
