@@ -16,6 +16,9 @@
 #include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <sstream>
+#include <fstream>
+#include <stdlib.h>
 
 #include <RH_RF69.h>
 #include <RH_RF95.h>
@@ -102,9 +105,9 @@ std::vector<std::string> split(std::string strToSplit, char delimeter)
   return splittedStrings;
 }
 
-std::string getEnvVar( std::string const & key ) const
+std::string getEnvVar( std::string const &key )
 {
-    char * val = getenv( key.c_str() );
+    char *val = getenv(key.c_str());
     return val == NULL ? std::string("") : std::string(val);
 }
 
@@ -112,7 +115,7 @@ void logger( const std::string &text )
 {
     std::ofstream log_file(
         "log_flight.log", std::ios_base::out | std::ios_base::app );
-    log_file << text << std::end;
+    log_file << text << std::endl;
     log_file.close();
 }
 
@@ -124,7 +127,12 @@ void sig_handler(int sig) {
 // Main Function
 int main(int argc, const char *argv[]) {
   unsigned long led_blink = 0;
-  const string deviceID = getEnvVar("device_id");
+  const std::string deviceID = getEnvVar("device_id");
+
+  if (deviceID.empty()) {
+    printf("Device ID Not Found. . .\n");
+    return 1;
+  }
 
   signal(SIGINT, sig_handler);
   printf("%s\n", __BASEFILE__);
@@ -134,7 +142,12 @@ int main(int argc, const char *argv[]) {
     return 1;
   }
 
-  printf("RF95 CS=GPIO%d", RF_CS_PIN);
+  std::cout << "\n[rf95_server][main][info] Initializing Device ID: " << std::flush;
+  std::cout << deviceID << std::endl;
+
+  printf("\n");
+
+  printf("[rf95_server][main][info] RF95 CS=GPIO%d", RF_CS_PIN);
 
 #ifdef RF_LED_PIN
   pinMode(RF_LED_PIN, OUTPUT);
@@ -233,7 +246,7 @@ int main(int argc, const char *argv[]) {
     // Begin the main body of code
     std::cout << "[rf95_server][main][info] Connecting to the MQTT server..." << std::flush;
     client.connect(connOpts);
-    std::cout << "[rf95_server][main][info] OK\n" << std::endl;
+    std::cout << "OK\n" << std::endl;
 
     std::cout << "[rf95_server][main][info] Listening packet...\n" << std::endl;
 
@@ -276,10 +289,10 @@ int main(int argc, const char *argv[]) {
               std::vector<std::string> extractReceivedData = split(message, '|');
 
               if (extractReceivedData.size() > 1) {
-                int64_t sendingTimeFromGS = strtoll(extractReceivedData[2]);
+                int64_t sendingTimeFromGS = strtoll(extractReceivedData[2].c_str(), NULL, 10);
                 int64_t receiveTimeDelayInMillis = receivedMessageTime - sendingTimeFromGS;
                 
-                logger("Message " + extractReceivedData[1] + " received in " + to_string(receiveTimeDelayInMillis) + " ms");
+                logger("Message " + extractReceivedData[1] + " received in " + std::to_string(receiveTimeDelayInMillis) + " ms");
 
                 if (extractReceivedData[0] == deviceID) {
                   // First use a message pointer.

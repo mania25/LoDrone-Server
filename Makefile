@@ -4,7 +4,7 @@
 # http://www.airspayce.com/mikem/bcm2835/
 
 CC            = g++
-CFLAGS        = -DRASPBERRY_PI -DBCM2835_NO_DELAY_COMPATIBILITY -D__BASEFILE__=\"$*\"
+CFLAGS        = -std=c++11 -DRASPBERRY_PI -DBCM2835_NO_DELAY_COMPATIBILITY -D__BASEFILE__=\"$*\"
 LIBS          = -lbcm2835 -lpaho-mqttpp3 -lpaho-mqtt3a
 RADIOHEADBASE = ./libs/RadioHead
 INCLUDE       = -I$(RADIOHEADBASE)
